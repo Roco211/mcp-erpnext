@@ -107,4 +107,98 @@ export const setupTools: ErpNextTool[] = [
       };
     },
   },
+
+  // ── Safe master data ───────────────────────────────────────────────────────
+
+  {
+    name: "erpnext_item_group_list",
+    annotations: { readOnlyHint: true },
+    _meta: DOCLIST_META,
+    description: "List ERPNext item groups. " +
+      "Fields: name, item_group_name, parent_item_group, is_group.",
+    category: "setup",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max results (default 20)" },
+      },
+    },
+    handler: async (input, ctx) => {
+      const limit = (input.limit as number) ?? 20;
+
+      const docs = await ctx.client.list("Item Group", {
+        fields: ["name", "item_group_name", "parent_item_group", "is_group"],
+        limit,
+        order_by: "modified desc",
+      });
+
+      return {
+        doctype: "Item Group",
+        count: docs.length,
+        data: docs,
+        _meta: DOCLIST_META,
+      };
+    },
+  },
+
+  {
+    name: "erpnext_uom_list",
+    annotations: { readOnlyHint: true },
+    _meta: DOCLIST_META,
+    description: "List ERPNext units of measure. " +
+      "Fields: name, uom_name, enabled.",
+    category: "setup",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max results (default 20)" },
+      },
+    },
+    handler: async (input, ctx) => {
+      const limit = (input.limit as number) ?? 20;
+
+      const docs = await ctx.client.list("UOM", {
+        fields: ["name", "uom_name", "enabled"],
+        limit,
+        order_by: "modified desc",
+      });
+
+      return {
+        doctype: "UOM",
+        count: docs.length,
+        data: docs,
+        _meta: DOCLIST_META,
+      };
+    },
+  },
+
+  {
+    name: "erpnext_brand_list",
+    annotations: { readOnlyHint: true },
+    _meta: DOCLIST_META,
+    description: "List ERPNext brands. Fields: name, brand, description.",
+    category: "setup",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max results (default 20)" },
+      },
+    },
+    handler: async (input, ctx) => {
+      const limit = (input.limit as number) ?? 20;
+
+      const docs = await ctx.client.list("Brand", {
+        fields: ["name", "brand", "description"],
+        limit,
+        order_by: "modified desc",
+      });
+
+      return {
+        doctype: "Brand",
+        count: docs.length,
+        data: docs,
+        _meta: DOCLIST_META,
+      };
+    },
+  },
 ];

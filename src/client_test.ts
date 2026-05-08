@@ -42,7 +42,12 @@ Deno.test("constructor - readOnlyOnly removes write tools", () => {
   });
   const tools = client.listTools();
 
-  assertEquals(tools.map((tool) => tool.name), ["erpnext_company_list"]);
+  assertEquals(tools.map((tool) => tool.name), [
+    "erpnext_company_list",
+    "erpnext_item_group_list",
+    "erpnext_uom_list",
+    "erpnext_brand_list",
+  ]);
   assertEquals(tools.every((tool) => tool.annotations?.readOnlyHint), true);
 });
 

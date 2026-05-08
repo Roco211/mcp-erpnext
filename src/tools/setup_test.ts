@@ -90,6 +90,61 @@ Deno.test("erpnext_company_list - passes limit", async () => {
   assertEquals(capturedLimit, 3);
 });
 
+// ── Safe master data list tools ──────────────────────────────────────────────
+
+for (
+  const entry of [
+    {
+      name: "erpnext_item_group_list",
+      doctype: "Item Group",
+      sample: { name: "Products", parent_item_group: "All Item Groups" },
+    },
+    {
+      name: "erpnext_uom_list",
+      doctype: "UOM",
+      sample: { name: "Nos", uom_name: "Numbers" },
+    },
+    {
+      name: "erpnext_brand_list",
+      doctype: "Brand",
+      sample: { name: "Acme", brand: "Acme" },
+    },
+  ]
+) {
+  Deno.test(`${entry.name} - lists ${entry.doctype} as a read-only doclist tool`, async () => {
+    let capturedDoctype = "";
+    let capturedLimit = 0;
+
+    const mockClient = makeMockClient({
+      list: async (doctype: string, opts: { limit?: number }) => {
+        capturedDoctype = doctype;
+        capturedLimit = opts?.limit ?? 0;
+        return [entry.sample];
+      },
+    });
+
+    const tool = getTool(entry.name);
+    const result = await tool.handler(
+      { limit: 7 },
+      makeCtx(mockClient),
+    ) as Record<
+      string,
+      unknown
+    >;
+
+    assertEquals(tool.annotations?.readOnlyHint, true);
+    assertEquals(
+      tool._meta?.ui?.resourceUri,
+      "ui://mcp-erpnext/doclist-viewer",
+    );
+    assertEquals(capturedDoctype, entry.doctype);
+    assertEquals(capturedLimit, 7);
+    assertEquals(result.doctype, entry.doctype);
+    assertEquals(result.count, 1);
+    assertEquals((result.data as unknown[]).length, 1);
+  });
+}
+
 // ── erpnext_company_create ──────────────────────────────────────────────────
 
 Deno.test("erpnext_company_create - throws if company_name missing", async () => {
