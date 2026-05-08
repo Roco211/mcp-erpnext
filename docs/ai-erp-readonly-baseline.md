@@ -33,23 +33,28 @@ Company delete=false
 
 ## 工具过滤
 
-本阶段只开放一个工具：
+本阶段默认只开放一个工具：
 
 ```text
 erpnext_company_list
 ```
 
-启动时设置：
+在 `ai-erp-platform` 工作区中，优先使用控制仓库脚本启动：
+
+```powershell
+cd C:\Users\roco2\Documents\Codex\2026-05-08\vibe-coding\ai-erp-platform\control-plane
+.\scripts\start-mcp-readonly.ps1
+```
+
+脚本会自动设置：
 
 ```powershell
 $env:ERPNEXT_URL = "http://127.0.0.1:8080"
-$env:ERPNEXT_API_KEY = "<本地只读用户 API key>"
-$env:ERPNEXT_API_SECRET = "<本地只读用户 API secret>"
 $env:ERPNEXT_MCP_TOOL_ALLOWLIST = "erpnext_company_list"
 $env:ERPNEXT_MCP_READ_ONLY_ONLY = "1"
 ```
 
-启动 HTTP 模式：
+手动启动 HTTP 模式：
 
 ```powershell
 npx -y deno run --allow-all server.ts --http --port=3013 --hostname=127.0.0.1
@@ -83,6 +88,16 @@ src/: 153 passed
 MCP_ALLOWED_TOOLS erpnext_company_list:readOnly=true
 MCP_COMPANY_LIST doctype=Company count=1
 ```
+
+控制仓库冒烟脚本：
+
+```powershell
+cd C:\Users\roco2\Documents\Codex\2026-05-08\vibe-coding\ai-erp-platform\control-plane
+.\scripts\test-mcp-readonly-smoke.ps1
+```
+
+冒烟路径会检查 ERPNext ping、Company REST 读取、MCP
+工具白名单、只读标记、工具调用和 HTTP 服务启动。
 
 ## 边界
 
