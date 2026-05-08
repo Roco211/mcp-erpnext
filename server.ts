@@ -50,6 +50,15 @@ import {
 
 const DEFAULT_HTTP_PORT = 3012;
 
+function parseCsv(value: string | undefined): string[] | undefined {
+  const items = value?.split(",").map((item) => item.trim()).filter(Boolean);
+  return items && items.length > 0 ? items : undefined;
+}
+
+function parseBool(value: string | undefined): boolean {
+  return ["1", "true", "yes"].includes((value ?? "").toLowerCase());
+}
+
 async function main() {
   const args = getArgs();
 
@@ -65,9 +74,10 @@ async function main() {
 
   // Category filtering
   const categoriesArg = args.find((arg) => arg.startsWith("--categories="));
-  const categories = categoriesArg
-    ? categoriesArg.split("=")[1].split(",")
-    : undefined;
+  const categories = parseCsv(categoriesArg?.split("=")[1]) ??
+    parseCsv(Deno.env.get("ERPNEXT_MCP_CATEGORIES"));
+  const toolNames = parseCsv(Deno.env.get("ERPNEXT_MCP_TOOL_ALLOWLIST"));
+  const readOnlyOnly = parseBool(Deno.env.get("ERPNEXT_MCP_READ_ONLY_ONLY"));
 
   // HTTP mode
   const httpFlag = args.includes("--http");
@@ -79,9 +89,11 @@ async function main() {
   const hostname = hostnameArg ? hostnameArg.split("=")[1] : "0.0.0.0";
 
   // Initialize tools client
-  const toolsClient = new ErpNextToolsClient(
-    categories ? { categories } : undefined,
-  );
+  const toolsClient = new ErpNextToolsClient({
+    categories,
+    toolNames,
+    readOnlyOnly,
+  });
 
   // Build MCP server
   const server = new ConcurrentMCPServer({

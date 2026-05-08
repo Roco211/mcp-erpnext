@@ -7,15 +7,39 @@
  * @module lib/erpnext/tests/tools/analytics_test
  */
 
-import { assert, assertEquals } from "jsr:@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { analyticsTools } from "./analytics.ts";
-import { FrappeClient } from "../api/frappe-client.ts";
+import type { FrappeClient } from "../api/frappe-client.ts";
 import type { ErpNextToolContext } from "./types.ts";
 
 // ── Mock FrappeClient ─────────────────────────────────────────────────────────
 
-// deno-lint-ignore no-explicit-any
-type AnyFn = (...args: any[]) => any;
+type AnyFn = (...args: string[]) => unknown;
+
+type AnalyticsDataset = {
+  values: number[];
+  type?: string;
+  yAxisId?: string;
+  stack?: string;
+};
+
+type AnalyticsResult = {
+  _meta: { ui: { resourceUri: string } };
+  title: string;
+  type: string;
+  labels: string[];
+  datasets: AnalyticsDataset[];
+  showRightAxis: boolean;
+  treeData: Array<{ name: string; value: number }>;
+  scatterData: Array<{ points: unknown[] }>;
+  label: string;
+  currency: string;
+  value: number;
+  sparkline: number[];
+  trendIsGood: boolean;
+  unit: string;
+  stages: Array<{ label: string; count: number; conversionRate: number }>;
+};
 
 function makeMockClient(overrides: Record<string, AnyFn> = {}): FrappeClient {
   const mock: Record<string, AnyFn> = {
@@ -40,8 +64,15 @@ function getTool(name: string) {
   return tool;
 }
 
-// deno-lint-ignore no-explicit-any
-function assertChartMeta(result: any, viewerName = "chart-viewer") {
+function currentMonthDate(day: number): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), day).toISOString().slice(
+    0,
+    10,
+  );
+}
+
+function assertChartMeta(result: AnalyticsResult, viewerName = "chart-viewer") {
   assert(result._meta, "Result should have _meta");
   assertEquals(result._meta.ui.resourceUri, `ui://mcp-erpnext/${viewerName}`);
 }
@@ -86,8 +117,7 @@ Deno.test("erpnext_stock_chart - returns bar chart data", async () => {
   });
 
   const tool = getTool("erpnext_stock_chart");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.title, "Stock Levels");
   assert(result.labels.length === 2, "Should aggregate by item");
@@ -107,8 +137,7 @@ Deno.test("erpnext_stock_chart - uses horizontal-bar for many items", async () =
   const mockClient = makeMockClient({ list: async () => items });
 
   const tool = getTool("erpnext_stock_chart");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.type, "horizontal-bar");
 });
@@ -125,11 +154,10 @@ Deno.test("erpnext_sales_chart - status grouping returns donut", async () => {
   });
 
   const tool = getTool("erpnext_sales_chart");
-  // deno-lint-ignore no-explicit-any
   const result = await tool.handler(
     { group_by: "status" },
     makeCtx(mockClient),
-  ) as any;
+  ) as AnalyticsResult;
 
   assertEquals(result.type, "donut");
   assertEquals(result.labels[0], "Paid"); // highest value first
@@ -146,11 +174,10 @@ Deno.test("erpnext_sales_chart - customer grouping returns horizontal-bar", asyn
   });
 
   const tool = getTool("erpnext_sales_chart");
-  // deno-lint-ignore no-explicit-any
   const result = await tool.handler(
     { group_by: "customer" },
     makeCtx(mockClient),
-  ) as any;
+  ) as AnalyticsResult;
 
   assertEquals(result.type, "horizontal-bar");
   assertEquals(result.labels[0], "Customer One");
@@ -176,11 +203,10 @@ Deno.test("erpnext_revenue_trend - returns line chart with monthly data", async 
   });
 
   const tool = getTool("erpnext_revenue_trend");
-  // deno-lint-ignore no-explicit-any
   const result = await tool.handler(
     { months: 3, type: "line" },
     makeCtx(mockClient),
-  ) as any;
+  ) as AnalyticsResult;
 
   assertEquals(result.type, "line");
   assertEquals(result.labels.length, 3);
@@ -194,22 +220,21 @@ Deno.test("erpnext_revenue_trend - customer grouping produces multiple datasets"
       {
         customer_name: "Acme",
         grand_total: 5000,
-        transaction_date: "2026-02-10",
+        transaction_date: currentMonthDate(10),
       },
       {
         customer_name: "Globex",
         grand_total: 3000,
-        transaction_date: "2026-02-15",
+        transaction_date: currentMonthDate(15),
       },
     ],
   });
 
   const tool = getTool("erpnext_revenue_trend");
-  // deno-lint-ignore no-explicit-any
   const result = await tool.handler(
     { months: 2, group_by: "customer" },
     makeCtx(mockClient),
-  ) as any;
+  ) as AnalyticsResult;
 
   assert(result.datasets.length >= 2, "Should have dataset per customer");
   assertChartMeta(result);
@@ -231,16 +256,15 @@ Deno.test("erpnext_order_breakdown - stacked-bar groups by customer and status",
   });
 
   const tool = getTool("erpnext_order_breakdown");
-  // deno-lint-ignore no-explicit-any
   const result = await tool.handler(
     { type: "stacked-bar" },
     makeCtx(mockClient),
-  ) as any;
+  ) as AnalyticsResult;
 
   assertEquals(result.type, "stacked-bar");
   assertEquals(result.labels[0], "Acme"); // highest total first
   assert(result.datasets.length >= 1);
-  assert(result.datasets.every((d: { stack: string }) => d.stack === "status"));
+  assert(result.datasets.every((d) => d.stack === "status"));
   assertChartMeta(result);
 });
 
@@ -253,11 +277,10 @@ Deno.test("erpnext_order_breakdown - pie mode returns single dataset", async () 
   });
 
   const tool = getTool("erpnext_order_breakdown");
-  // deno-lint-ignore no-explicit-any
   const result = await tool.handler(
     { type: "pie" },
     makeCtx(mockClient),
-  ) as any;
+  ) as AnalyticsResult;
 
   assertEquals(result.type, "pie");
   assertEquals(result.datasets.length, 1);
@@ -276,8 +299,7 @@ Deno.test("erpnext_revenue_vs_orders - returns composed chart with dual axis", a
   });
 
   const tool = getTool("erpnext_revenue_vs_orders");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.type, "composed");
   assertEquals(result.showRightAxis, true);
@@ -302,8 +324,7 @@ Deno.test("erpnext_stock_treemap - returns treemap data", async () => {
   });
 
   const tool = getTool("erpnext_stock_treemap");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.type, "treemap");
   assert(result.treeData.length === 2);
@@ -322,14 +343,14 @@ Deno.test("erpnext_stock_treemap - group by warehouse aggregates", async () => {
   });
 
   const tool = getTool("erpnext_stock_treemap");
-  // deno-lint-ignore no-explicit-any
   const result = await tool.handler(
     { group_by: "warehouse" },
     makeCtx(mockClient),
-  ) as any;
+  ) as AnalyticsResult;
 
   assertEquals(result.treeData.length, 2);
-  const w1 = result.treeData.find((t: { name: string }) => t.name === "W1");
+  const w1 = result.treeData.find((t) => t.name === "W1");
+  assert(w1);
   assertEquals(w1.value, 8000);
 });
 
@@ -359,8 +380,7 @@ Deno.test("erpnext_product_radar - returns radar with auto-selected items", asyn
   });
 
   const tool = getTool("erpnext_product_radar");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.type, "radar");
   assertEquals(result.datasets.length, 2);
@@ -388,8 +408,7 @@ Deno.test("erpnext_price_vs_qty - falls back to Bin data when no Item Price", as
   });
 
   const tool = getTool("erpnext_price_vs_qty");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.type, "scatter");
   assert(result.scatterData.length > 0);
@@ -417,8 +436,7 @@ Deno.test("erpnext_kpi_revenue - returns KPI with sparkline (single API call)", 
   });
 
   const tool = getTool("erpnext_kpi_revenue");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.label, "Revenue MTD");
   assertEquals(result.currency, "EUR");
@@ -442,8 +460,7 @@ Deno.test("erpnext_kpi_outstanding - sums outstanding invoices", async () => {
   });
 
   const tool = getTool("erpnext_kpi_outstanding");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.label, "Outstanding Receivables");
   assertEquals(result.value, 5000);
@@ -459,8 +476,7 @@ Deno.test("erpnext_kpi_orders - counts orders this month", async () => {
   });
 
   const tool = getTool("erpnext_kpi_orders");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.label, "Orders This Month");
   assertEquals(result.value, 2); // count, not sum
@@ -492,8 +508,7 @@ Deno.test("erpnext_kpi_gross_margin - computes margin from SO items and Bin", as
   });
 
   const tool = getTool("erpnext_kpi_gross_margin");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.label, "Gross Margin");
   assertEquals(result.unit, "%");
@@ -513,8 +528,7 @@ Deno.test("erpnext_kpi_overdue - counts overdue invoices", async () => {
   });
 
   const tool = getTool("erpnext_kpi_overdue");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.label, "Overdue Invoices");
   assertEquals(result.value, 2);
@@ -545,8 +559,7 @@ Deno.test("erpnext_sales_funnel - returns 4-stage funnel with conversion rates",
   });
 
   const tool = getTool("erpnext_sales_funnel");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.title, "Sales Funnel");
   assertEquals(result.stages.length, 4);
@@ -595,8 +608,7 @@ Deno.test("erpnext_ar_aging - groups invoices into aging buckets", async () => {
   });
 
   const tool = getTool("erpnext_ar_aging");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.type, "stacked-bar");
   assert(result.labels.length > 0);
@@ -629,8 +641,7 @@ Deno.test("erpnext_gross_profit - returns composed chart with margin line", asyn
   });
 
   const tool = getTool("erpnext_gross_profit");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({}, makeCtx(mockClient)) as any;
+  const result = await tool.handler({}, makeCtx(mockClient)) as AnalyticsResult;
 
   assertEquals(result.type, "composed");
   assertEquals(result.showRightAxis, true);
@@ -654,8 +665,10 @@ Deno.test("erpnext_profit_loss - returns monthly income vs expense", async () =>
   });
 
   const tool = getTool("erpnext_profit_loss");
-  // deno-lint-ignore no-explicit-any
-  const result = await tool.handler({ months: 3 }, makeCtx(mockClient)) as any;
+  const result = await tool.handler(
+    { months: 3 },
+    makeCtx(mockClient),
+  ) as AnalyticsResult;
 
   assertEquals(result.type, "composed");
   assert(result.labels.length > 0);
@@ -683,8 +696,7 @@ Deno.test("all analytics tools have name, description, category, handler", () =>
 
 Deno.test("all analytics tools have _meta with resourceUri", () => {
   for (const tool of analyticsTools) {
-    // deno-lint-ignore no-explicit-any
-    const meta = (tool as any)._meta;
+    const meta = tool._meta;
     assert(meta, `${tool.name} should have _meta`);
     assert(meta.ui, `${tool.name} should have _meta.ui`);
     assert(

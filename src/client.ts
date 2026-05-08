@@ -76,6 +76,10 @@ export interface MCPToolWireFormat {
 export interface ErpNextToolsClientOptions {
   /** Restrict tools to specific categories (e.g. `["selling", "stock"]`). Omit to load all. */
   categories?: string[];
+  /** Restrict tools to this exact allowlist after category filtering. */
+  toolNames?: string[];
+  /** Only include tools annotated as read-only. */
+  readOnlyOnly?: boolean;
 }
 
 /**
@@ -86,11 +90,28 @@ export class ErpNextToolsClient {
   private tools: ErpNextTool[];
 
   constructor(options?: ErpNextToolsClientOptions) {
-    if (options?.categories) {
-      this.tools = options.categories.flatMap((cat) => getToolsByCategory(cat));
-    } else {
-      this.tools = allTools;
+    let tools = options?.categories
+      ? options.categories.flatMap((cat) => getToolsByCategory(cat))
+      : allTools;
+
+    if (options?.toolNames?.length) {
+      const allowlist = new Set(options.toolNames);
+      const unknown = options.toolNames.filter((name) => !getToolByName(name));
+      if (unknown.length > 0) {
+        throw new Error(
+          `[ErpNextToolsClient] Unknown tools in allowlist: ${
+            unknown.join(", ")
+          }`,
+        );
+      }
+      tools = tools.filter((tool) => allowlist.has(tool.name));
     }
+
+    if (options?.readOnlyOnly) {
+      tools = tools.filter((tool) => tool.annotations?.readOnlyHint === true);
+    }
+
+    this.tools = tools;
   }
 
   /** List available tools (with handler attached) */

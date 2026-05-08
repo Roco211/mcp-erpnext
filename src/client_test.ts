@@ -26,6 +26,38 @@ Deno.test("toMCPFormat - passes through annotations when defined", () => {
   assertEquals(wireToolsWithAnnotations.length, toolsWithAnnotations.length);
 });
 
+Deno.test("constructor - filters tools by allowlist", () => {
+  const client = new ErpNextToolsClient({
+    toolNames: ["erpnext_company_list"],
+  });
+  const tools = client.listTools();
+
+  assertEquals(tools.map((tool) => tool.name), ["erpnext_company_list"]);
+});
+
+Deno.test("constructor - readOnlyOnly removes write tools", () => {
+  const client = new ErpNextToolsClient({
+    categories: ["setup"],
+    readOnlyOnly: true,
+  });
+  const tools = client.listTools();
+
+  assertEquals(tools.map((tool) => tool.name), ["erpnext_company_list"]);
+  assertEquals(tools.every((tool) => tool.annotations?.readOnlyHint), true);
+});
+
+Deno.test("constructor - allowlist rejects unknown tools", () => {
+  let error: Error | undefined;
+  try {
+    new ErpNextToolsClient({ toolNames: ["erpnext_missing_tool"] });
+  } catch (err) {
+    error = err as Error;
+  }
+
+  assert(error);
+  assert(error.message.includes("erpnext_missing_tool"));
+});
+
 Deno.test("toMCPFormat - all viewer tools have MCPToolMeta _meta", () => {
   const client = new ErpNextToolsClient();
   const mcpTools = client.toMCPFormat();
