@@ -38,6 +38,7 @@ import {
 } from "@casys/mcp-server";
 import { ErpNextToolsClient } from "./src/client.ts";
 import { FrappeAPIError } from "./src/api/frappe-client.ts";
+import { resolveRuntimeProfile } from "./src/runtime-profile.ts";
 import { UI_VIEWERS } from "./src/ui/viewers.ts";
 import { resolveViewerDistPath } from "./src/ui/viewer-resource-paths.ts";
 import {
@@ -78,6 +79,12 @@ async function main() {
     parseCsv(Deno.env.get("ERPNEXT_MCP_CATEGORIES"));
   const toolNames = parseCsv(Deno.env.get("ERPNEXT_MCP_TOOL_ALLOWLIST"));
   const readOnlyOnly = parseBool(Deno.env.get("ERPNEXT_MCP_READ_ONLY_ONLY"));
+  const runtimeProfile = resolveRuntimeProfile({
+    categories,
+    toolNames,
+    readOnlyOnly,
+    profile: Deno.env.get("ERPNEXT_MCP_PROFILE"),
+  });
 
   // HTTP mode
   const httpFlag = args.includes("--http");
@@ -89,11 +96,7 @@ async function main() {
   const hostname = hostnameArg ? hostnameArg.split("=")[1] : "0.0.0.0";
 
   // Initialize tools client
-  const toolsClient = new ErpNextToolsClient({
-    categories,
-    toolNames,
-    readOnlyOnly,
-  });
+  const toolsClient = new ErpNextToolsClient(runtimeProfile.clientOptions);
 
   // Build MCP server
   const server = new ConcurrentMCPServer({
@@ -154,7 +157,13 @@ async function main() {
 
   console.error(
     `[mcp-erpnext] Initialized — ${toolsClient.count} tools${
-      categories ? ` (categories: ${categories.join(", ")})` : ""
+      runtimeProfile.clientOptions.categories
+        ? ` (categories: ${runtimeProfile.clientOptions.categories.join(", ")})`
+        : ""
+    }${
+      runtimeProfile.profileApplied
+        ? ` (profile: ${runtimeProfile.profileName})`
+        : ""
     }`,
   );
 
